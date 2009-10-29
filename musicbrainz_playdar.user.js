@@ -96,6 +96,10 @@ function do_search () {
     var tracks = document.getElementsByClassName("track");
     for (var i = 0; i < tracks.length; i++) {
         t = tracks[i];
+        if (t.children.length == 5) {
+            // Per artist tracks
+            artistName = t.children[2].children[0].children[0].innerHTML;
+        }
         var anchor = t.children[1].children[0];
         var trackName = anchor.innerHTML
         var qid = Playdar.Util.generate_uuid();
