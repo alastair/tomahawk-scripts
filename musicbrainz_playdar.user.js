@@ -1,7 +1,8 @@
 // ==UserScript==
 // @name           Musicbrainz playdar
-// @namespace      http://alastair.githib.com
+// @namespace      http://alastair.github.com
 // @include        http://musicbrainz.org/release/*
+// @include        http://musicbrainz.org/show/release/*
 // ==/UserScript==
 
 
@@ -81,13 +82,16 @@ function start_status (qid, node) {
 }
 
 function do_search () {
+    var rels = document.getElementsByClassName("RelationshipBox")[0];
+    var relHtml = rels.innerHTML;
+    var releaseId = relHtml.match(/.*?releaseid=(.*?)&amp;addrel=1.*/)[1];
     var artist = document.getElementsByClassName("artisttitle")[0];
-    var release = document.getElementsByClassName("releasebegin")[0];
+    var release = document.getElementById("release::"+releaseId);
 
     var artistName = artist.children[0].children[0].children[1].children[0].innerHTML;
     var releaseName = release.children[0].children[0].children[0].children[0].children[0].innerHTML;
-    console.debug(artistName);
-    console.debug(releaseName);
+//    console.debug(artistName);
+//    console.debug(releaseName);
 
     var tracks = document.getElementsByClassName("track");
     for (var i = 0; i < tracks.length; i++) {
@@ -103,17 +107,20 @@ function do_search () {
 
 var results_handler = function (response, final_answer) {
     if (final_answer) {
+        var element = document.getElementById(response.qid);
+        element.style.backgroundImage = 'none';
         if (response.results.length) {
-            var element = document.getElementById(response.qid);
             var sid = response.results[0].sid;
             Playdar.player.register_stream(response.results[0]);
-            element.style.backgroundImage = 'none';
             element.innerHTML = "<a href=\"#\">♫&nbsp;</a>";
             element.addEventListener('click', function(event) {
                 Playdar.player.play_stream(sid);
                 event.stopPropagation();
                 event.preventDefault();
             }, true);
+        } else {
+            element.style.color = "#000";
+            element.innerHTML = "×";
         }
     }
 };
