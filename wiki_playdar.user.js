@@ -1,8 +1,14 @@
 // ==UserScript==
 // @name           Wiki Playdar
-// @namespace      http://alastair.githib.com
+// @namespace      http://alastair.github.com
 // @include        http://wikipedia.org
 // ==/UserScript==
+
+/*
+Reads song info from wikipedia infoboxes
+http://en.wikipedia.org/wiki/Wikipedia:WikiProject_Songs#Infobox
+Handles Songs and Singles
+*/
 
 function load_script (url) {
     // Load the playdar.js
@@ -29,23 +35,24 @@ GM_wait(); // wait for playdar.js to load.
 function setup_playdar () {
     Playdar.setup({
         name: "Wikipedia Greasemonkey",
-        website: "http://en.wikipedia.org",
-	receiverurl: ""
+        website: "http://github.com/alastair/playdar-scripts",
+        receiverurl: ""
     });
     var listeners = {
-	    onStat: function (detected) {
-		if (detected) {
-		    console.debug('Playdar detected');
-		} else {
-		    console.debug('Playdar unavailabled');
-		}
-	    },
-	    onAuth: function () {
-		console.debug('Access to Playdar authorised');
-	    },
-	    onAuthClear: function () {
-		console.debug('User revoked authorisation');
-	    }
+        onStat: function (detected) {
+            if (detected) {
+                console.debug('Playdar detected');
+            } else {
+                console.debug('Playdar unavailable');
+            }
+        },
+        onAuth: function () {
+            console.debug('Access to Playdar authorised');
+                do_search();
+            },
+            onAuthClear: function () {
+                console.debug('User revoked authorisation');
+            }
     };
 
     Playdar.client.register_listeners(listeners);
@@ -53,60 +60,82 @@ function setup_playdar () {
     soundManager.url = 'http://' + playdar_web_host + '/static/soundmanager2_flash9.swf';
     soundManager.flashVersion = 9;
     soundManager.onload = function () {
-    Playdar.setup_player(soundManager);
-    Playdar.client.init();
-	Playdar.client.register_results_handler(results_handler);
-
-    var table = document.getElementsByClassName("infobox")[0];
-    var b = table.innerHTML
-
-    var song = b.match(/.*?<th.*?>"(.*?)"<\/th>.*/)[1];
-    var artist = b.match(/.*?(Single|Song)<\/a> by <a href=".*?>(.*?)<\/a>.*?/)[2];
-    var album = b.match(/.*?from the album <i><a.*?>(.*?)<\/a>.*/)[1];
-
-    console.debug(song);
-    console.debug(artist);
-    console.debug(album);
-
-	Playdar.client.resolve(artist, album, song);
+        Playdar.setup_player(soundManager);
+        Playdar.client.init();
     };
+
 };
+
+function do_search () {
+    var infoBoxes = document.getElementsByClassName("infobox");
+    for (var i = 0; i < infoBoxes.length; i++) {
+        box = infoBoxes[i];
+        var text = box.innerHTML.replace(/<(?:[^>'"]|".*?"|'.*?')+>/g, "");
+        var artist = text.match(/.*?(Single|Song) by (.*)/);
+        if (artist == null) {
+            continue;  // Not an infobox we recognise
+        }
+        var artistName = artist[2];
+        
+        var album = text.match(/.*?from the album (.*)/);
+        albumName = "";
+        if (album != null) {
+            var albumName = album[1];
+        }
+        var trackName = text.match(/^"(.*)"$/m)[1];
+
+        var title = box.children[0].children[0];
+        var qid = Playdar.Util.generate_uuid();
+        start_status(qid, title);
+        Playdar.client.register_results_handler(results_handler, qid);
+        Playdar.client.resolve(artistName, albumName, trackName, qid);
+    }
+};
+
+function start_status (qid, node) {
+    var tr = document.createElement('tr');
+    var status = document.createElement('th');
+
+    status.id = qid;
+    status.style.border = 0;
+    status.colSpan = node.children[0].colSpan;
+    status.style.fontSize = "100%";
+    status.innerHTML = '<img src="http://' + playdar_web_host + '/static/spinner_10px.gif">';
+    
+    tr.appendChild(status);
+    var parent = node.parentNode;
+    parent.insertBefore(tr, node.nextSibling);
+}
 
 var results_handler = function (response, final_answer) {
     if (final_answer) {
+        var element = document.getElementById(response.qid);
+        element.style.backgroundImage = 'none';
         if (response.results.length) {
-		var table = document.getElementsByClassName("infobox")[0];
-		var first = table.rows[0]
-		var element = document.createElement("tr");
-        element.style.backgroundColor = "#0a0";
-        var sid = response.results[0].sid;
-		var an = document.createElement("a");
-		an.href="#";
-		an.addEventListener('click', function(event) {
-			Playdar.player.play_stream(sid);
-            event.stopPropagation();
-            event.preventDefault();
-        }, true);
-		an.innerHTML = "Play from Playdar";
-		var td = document.createElement("td");
-		element.appendChild(td);
-		td.appendChild(an);
-
-        Playdar.player.register_stream(response.results[0]);
-		first.parentNode.insertBefore(element, first.nextSibling);
-    } else {
-            console.debug('No results');
+            var result = choose_best_result(response);
+            Playdar.player.register_stream(result);
+            element.innerHTML = '<a href="#">♫ Play with Playdar</a>';
+            element.addEventListener('click', function(event) {
+                Playdar.player.play_stream(result.sid);
+                event.stopPropagation();
+                event.preventDefault();
+            }, true);
+        } else {
+            element.style.color = "#000";
+            element.innerHTML = "× Unavailable on playdar";
         }
     }
 };
 
-/*
-function resolve (link, artist, track, results_handler) {
-    var qid = Playdar.Util.generate_uuid();
-    // add a "searching..." status :
-    start_status(qid, link);
-    // register results handler and resolve for this qid
-    Playdar.client.register_results_handler(results_handler, qid);
-    Playdar.client.resolve(artist, "", track, qid);
+function choose_best_result (response) {
+    if (response.results.length > 1 && response.query.album != "" ) {
+        // Playdar currently doesn't seem to consider album when returning the first
+        // best match.  Could be less strict...
+        for (var i = 0; i < response.results.length; i++) {
+            if (response.results[i].album == response.query.album) {
+                return response.results[i];
+            }
+        }
+    }
+    return response.results[0];
 }
-*/
