@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           Wiki Playdar
 // @namespace      http://alastair.github.com
-// @include        http://wikipedia.org
+// @include        http://en.wikipedia.org/*
 // ==/UserScript==
 
 /*
