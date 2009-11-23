@@ -18,7 +18,7 @@ function load_script (url) {
 }
 var playdar_web_host = "www.playdar.org";
 // same js is served, this is just for log-grepping ease.
-load_script('http://' + playdar_web_host + '/static/playdar.js?greasemonkey');
+load_script('http://playdarjs.org/playdar.js?greasemonkey');
 load_script('http://' + playdar_web_host + '/static/soundmanager2-nodebug-jsmin.js?greasemonkey');
 
 function GM_wait() {
@@ -33,12 +33,7 @@ function GM_wait() {
 GM_wait(); // wait for playdar.js to load.
 
 function setup_playdar () {
-    Playdar.setup({
-        name: "Wikipedia Greasemonkey",
-        website: "http://github.com/alastair/playdar-scripts",
-        receiverurl: ""
-    });
-    var listeners = {
+    Playdar.setupClient({
         onStat: function (detected) {
             if (detected) {
                 console.debug('Playdar detected');
@@ -46,6 +41,7 @@ function setup_playdar () {
                 console.debug('Playdar unavailable');
             }
         },
+
         onAuth: function () {
             console.debug('Access to Playdar authorised');
                 do_search();
@@ -53,17 +49,14 @@ function setup_playdar () {
             onAuthClear: function () {
                 console.debug('User revoked authorisation');
             }
-    };
+    });
 
-    Playdar.client.register_listeners(listeners);
-    
     soundManager.url = 'http://' + playdar_web_host + '/static/soundmanager2_flash9.swf';
     soundManager.flashVersion = 9;
     soundManager.onload = function () {
-        Playdar.setup_player(soundManager);
-        Playdar.client.init();
+        Playdar.setupPlayer(soundManager);
+        Playdar.client.go();
     };
-
 };
 
 function do_search () {
@@ -71,7 +64,7 @@ function do_search () {
     for (var i = 0; i < infoBoxes.length; i++) {
         box = infoBoxes[i];
         var text = box.innerHTML.replace(/<(?:[^>'"]|".*?"|'.*?')+>/g, "");
-        var artist = text.match(/.*?(Single|Song) by (.*)/);
+        var artist = text.match(/.*?(Single|Song).+by (.*)/);
         if (artist == null) {
             continue;  // Not an infobox we recognise
         }
@@ -88,7 +81,7 @@ function do_search () {
         var qid = Playdar.Util.generate_uuid();
         start_status(qid, title);
         Playdar.client.register_results_handler(results_handler, qid);
-        Playdar.client.resolve(artistName, albumName, trackName, qid);
+        Playdar.client.resolve(artistName, trackName, albumName, qid);
     }
 };
 
