@@ -14,7 +14,7 @@ function load_script (url) {
 }
 var playdar_web_host = "www.playdar.org";
 // same js is served, this is just for log-grepping ease.
-load_script('http://' + playdar_web_host + '/static/playdar.js?greasemonkey');
+load_script('http://playdarjs.org/playdar.js?greasemonkey');
 load_script('http://' + playdar_web_host + '/static/soundmanager2-nodebug-jsmin.js?greasemonkey');
 
 function GM_wait() {
@@ -29,38 +29,30 @@ function GM_wait() {
 GM_wait(); // wait for playdar.js to load.
 
 function setup_playdar () {
-    Playdar.setup({
-        name: "Musicbrainz Greasemonkey",
-        website: "http://musicbrainz.org",
-        receiverurl: ""
-    });
-    var listeners = {
-	    onStat: function (detected) {
-		    if (detected) {
-		        console.debug('Playdar detected');
-		    } else {
-		        console.debug('Playdar unavailable');
-		    }
-	    },
-	    onAuth: function () {
-            console.debug('Access to Playdar authorised');
-            do_search();
-	    },
-	    onAuthClear: function () {
-            console.debug('User revoked authorisation');
-	    }
-    };
+    Playdar.setupClient({
+        onStat: function (detected) {
+            if (detected) {
+                console.debug('Playdar detected');
+            } else {
+                console.debug('Playdar unavailable');
+            }
+        },
 
-    Playdar.client.register_listeners(listeners);
-    
+        onAuth: function () {
+            console.debug('Access to Playdar authorised');
+                do_search();
+            },
+            onAuthClear: function () {
+                console.debug('User revoked authorisation');
+            }
+    });
+
     soundManager.url = 'http://' + playdar_web_host + '/static/soundmanager2_flash9.swf';
     soundManager.flashVersion = 9;
     soundManager.onload = function () {
-        Playdar.setup_player(soundManager);
-        Playdar.client.init();
-        console.debug("soundmanager loaded");
+        Playdar.setupPlayer(soundManager);
+        Playdar.client.go();
     };
-
 };
 
 function start_status (qid, node) {
@@ -84,12 +76,12 @@ function start_status (qid, node) {
 function do_search () {
     var rels = document.getElementsByClassName("RelationshipBox")[0];
     var relHtml = rels.innerHTML;
-    var releaseId = relHtml.match(/.*?releaseid=(.*?)&amp;addrel=1.*/)[1];
+    var releaseId = relHtml.match(/.*?releaseid=(.*?)".*/)[1];
     var artist = document.getElementsByClassName("artisttitle")[0];
     var release = document.getElementById("release::"+releaseId);
 
     var artistName = artist.children[0].children[0].children[1].children[0].innerHTML;
-    var releaseName = release.children[0].children[0].children[0].children[0].children[0].innerHTML;
+    var releaseName = release.children[0].children[0].children[1].children[0].innerHTML;
 //    console.debug(artistName);
 //    console.debug(releaseName);
 
@@ -105,7 +97,8 @@ function do_search () {
         var qid = Playdar.Util.generate_uuid();
         start_status(qid, anchor);
         Playdar.client.register_results_handler(results_handler, qid);
-        Playdar.client.resolve(artistName, releaseName, trackName, qid);
+//        console.debug("artist: "+  artistName + ", release: " + releaseName + ", track: " + trackName);
+        Playdar.client.resolve(artistName, trackName, releaseName, qid);
     }
 };
 
@@ -124,7 +117,7 @@ var results_handler = function (response, final_answer) {
             }, true);
         } else {
             element.style.color = "#000";
-            element.innerHTML = "×";
+            element.innerHTML = "×&nbsp;";
         }
     }
 };
