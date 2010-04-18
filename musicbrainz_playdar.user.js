@@ -84,7 +84,7 @@ function start_status (qid, node) {
 function do_search () {
     var rels = document.getElementsByClassName("RelationshipBox")[0];
     var relHtml = rels.innerHTML;
-    var releaseId = relHtml.match(/.*?releaseid=(.*?)".*/)[1];
+    var releaseId = relHtml.match(/.*?releaseid=([0-9]+)/)[1];
     var artist = document.getElementsByClassName("artisttitle")[0];
     var release = document.getElementById("release::"+releaseId);
 
